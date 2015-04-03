@@ -1,0 +1,16 @@
+import sbt._
+import Keys._
+
+object Commons {
+  val appVersion = "1.0.0-SNAPSHOT"
+  val commonScalaVersion = "2.11.6"
+
+  val settings: Seq[Def.Setting[_]] = Seq(
+    version := appVersion,
+    scalaVersion := commonScalaVersion,
+    resolvers ++= Seq(
+      Opts.resolver.mavenLocalFile,
+      "local repository" at "http://192.168.1.100:8081/nexus/content/groups/public/"
+    )
+  )
+}
