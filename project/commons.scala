@@ -10,7 +10,9 @@ object Commons {
     scalaVersion := commonScalaVersion,
     resolvers ++= Seq(
       Opts.resolver.mavenLocalFile,
-      "local repository" at "http://192.168.1.100:8081/nexus/content/groups/public/"
+      resolvers += Resolver.typesafeRepo("releases"),
+      resolvers += Resolver.sonatypeRepo("releases")
+      //"local repository" at "http://192.168.1.100:8081/nexus/content/groups/public/"
     )
   )
 }
