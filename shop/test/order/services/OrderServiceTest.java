@@ -14,6 +14,8 @@ import org.junit.Test;
 import utils.Global;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.function.BiFunction;
 
 import static play.test.Helpers.fakeApplication;
 import static play.test.Helpers.running;
@@ -27,6 +29,8 @@ public class OrderServiceTest extends BaseTest{
     @Test
     public void testCRUDInOrder() {
         running(fakeApplication(), () -> {
+
+            prepareOrders(0, 0);
 
             OrderService orderService = Global.ctx.getBean(OrderService.class);
             String orderNo = RandomStringUtils.randomNumeric(8);
@@ -109,12 +113,12 @@ public class OrderServiceTest extends BaseTest{
 
             OrderService orderService = Global.ctx.getBean(OrderService.class);
 
-            prepareOrders(50);
+            prepareOrders(50, 3);
 
             //测试分页方法
-            List<Order> orders = orderService.findByKey(of(new Page(1, Page.DEFAULT_PAGE_SIZE)), empty(), of(OrderStatus.WAIT_PROCESS), empty(), empty());
+            List<Order> orders = orderService.findByKey(of(new Page<>(1, Page.DEFAULT_PAGE_SIZE)), empty(), of(OrderStatus.WAIT_PROCESS), empty(), empty());
             assert orders.size() == Page.DEFAULT_PAGE_SIZE;
-            orders = orderService.findByKey(of(new Page(2, 20)), empty(), empty(), empty(), empty());
+            orders = orderService.findByKey(of(new Page<>(2, 20)), empty(), empty(), empty(), empty());
             assert orders.size() == 20;
 
 
@@ -124,40 +128,77 @@ public class OrderServiceTest extends BaseTest{
     @Test
     public void testFindByComplicateKey() {
         running(fakeApplication(), () -> {
-
             OrderService orderService = Global.ctx.getBean(OrderService.class);
 
-            prepareOrders(50);
+            prepareOrders(50, 3);
+            runTestFindByComplicateMethodJpql(orderService::findByComplicateKey);
+            prepareOrders(50, 1);
+            runTestFindByComplicateMethodJpql(orderService::findByComplicateKey);
+        });
+    }
 
-            OrderSearcher orderSearcher = new OrderSearcher();
-            orderSearcher.status = OrderStatus.WAIT_PROCESS;
-            orderSearcher.type = OrderType.NORMAL;
-            orderSearcher.orderItemStatus = OrderItemStatus.NOT_SIGNED;
+    @Test
+    public void testFindByComplicateKeyWithJpql() {
+        running(fakeApplication(), () -> {
+            OrderService orderService = Global.ctx.getBean(OrderService.class);
 
-            List<Order> orders = orderService.findByComplicateKey(of(new Page(1, Page.DEFAULT_PAGE_SIZE)), orderSearcher);
-            assert orders.size() == Page.DEFAULT_PAGE_SIZE;
-
-            orders = orderService.findByComplicateKey(of(new Page(4, Page.DEFAULT_PAGE_SIZE)), orderSearcher);
-            System.out.println(orders.size());
-            assert orders.size() == 5;
-
-            orderSearcher.orderItemStatus = OrderItemStatus.SIGNED;
-            orders = orderService.findByComplicateKey(of(new Page(1, Page.DEFAULT_PAGE_SIZE)), orderSearcher);
-            assert orders.size() == 0;
-
-
+            prepareOrders(50, 3);
+            runTestFindByComplicateMethodJpql(orderService::findByComplicateKeyWithJpql);
+            prepareOrders(50, 1);
+            runTestFindByComplicateMethodJpql(orderService::findByComplicateKeyWithJpql);
 
         });
     }
 
-    private void prepareOrders(int size) {
+    @Test
+    public void testFindByComplicateKeyWithGeneralDaoQuery() {
+        running(fakeApplication(), () -> {
+            OrderService orderService = Global.ctx.getBean(OrderService.class);
+
+            prepareOrders(50, 3);
+            runTestFindByComplicateMethodJpql(orderService::findByComplicateKeyWithGeneralDaoQuery);
+            prepareOrders(50, 1);
+            runTestFindByComplicateMethodJpql(orderService::findByComplicateKeyWithGeneralDaoQuery);
+
+        });
+    }
+
+
+    private void runTestFindByComplicateMethodJpql(BiFunction<Optional<Page<Order>>, OrderSearcher, List<Order>> method) {
+
+        OrderSearcher orderSearcher = new OrderSearcher();
+        orderSearcher.status = OrderStatus.WAIT_PROCESS;
+        orderSearcher.type = OrderType.NORMAL;
+        orderSearcher.orderItemStatus = OrderItemStatus.NOT_SIGNED;
+
+        List<Order> orders = method.apply(of(new Page<>(1, Page.DEFAULT_PAGE_SIZE)), orderSearcher);
+        assert orders.size() == Page.DEFAULT_PAGE_SIZE;
+
+        Page<Order> page = new Page<>(4, Page.DEFAULT_PAGE_SIZE);
+        orders = method.apply(of(page), orderSearcher);
+        System.out.println(orders.size());
+        assert orders.size() == 5;
+        assert page.getResult().size() == orders.size();
+        assert page.getTotalCount() == 50;
+
+        orderSearcher.orderItemStatus = OrderItemStatus.SIGNED;
+        page = new Page<>(1, Page.DEFAULT_PAGE_SIZE);
+        orders = method.apply(of(page), orderSearcher);
+        assert orders.size() == 0;
+        assert page.getResult().size() == orders.size();
+        assert page.getTotalCount() == 0;
+
+    }
+
+
+    private void prepareOrders(int orderSize, int itemPerOrderSize) {
         doInTransaction(em -> {
 
             em.createQuery("delete from OrderItem").executeUpdate();
             em.createQuery("delete from Order").executeUpdate();
 
             //创建订单
-            for (int i = 0; i < size; i++) {
+            for (int i = 0; i < orderSize; i++) {
                 Order order = new Order();
                 order.setOrderNo(RandomStringUtils.randomNumeric(8));
                 order.setPlatformType(PlatformType.WEB);
@@ -167,19 +208,20 @@ public class OrderServiceTest extends BaseTest{
 
                 em.persist(order);
 
-                OrderItem orderItem = new OrderItem();
-                orderItem.setOrderId(order.getId());
-                orderItem.setBuyCount(5);
-                orderItem.setPlatformType(order.getPlatformType());
-                orderItem.setDiscountFee(Money.valueOf(10));
-                orderItem.setPrice(Money.valueOf(20));
-                orderItem.setStatus(OrderItemStatus.NOT_SIGNED);
-                orderItem.setType(OrderItemType.PRODUCT);
-                orderItem.setProductId(Integer.parseInt(RandomStringUtils.randomNumeric(8)));
-                orderItem.setProductSku(RandomStringUtils.randomAlphabetic(8));
+                for (int j = 0; j < itemPerOrderSize; j++) {
+                    OrderItem orderItem = new OrderItem();
+                    orderItem.setOrderId(order.getId());
+                    orderItem.setBuyCount(5);
+                    orderItem.setPlatformType(order.getPlatformType());
+                    orderItem.setDiscountFee(Money.valueOf(10));
+                    orderItem.setPrice(Money.valueOf(20));
+                    orderItem.setStatus(OrderItemStatus.NOT_SIGNED);
+                    orderItem.setType(OrderItemType.PRODUCT);
+                    orderItem.setProductId(Integer.parseInt(RandomStringUtils.randomNumeric(8)));
+                    orderItem.setProductSku(RandomStringUtils.randomAlphabetic(8));
 
-                em.persist(orderItem);
-
+                    em.persist(orderItem);
+                }
             }
 
             return null;

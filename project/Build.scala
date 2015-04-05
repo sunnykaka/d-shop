@@ -43,11 +43,13 @@ object ApplicationBuild extends Build {
         val dirs = Seq(dir / "ref", dir / "javascript")
         dirs.foreach(_.mkdirs)
         Seq[File]()
-      }
-//      unmanagedSourceDirectories in Compile += (sourceManaged in Compile).value
+      },
+      unmanagedSourceDirectories in Compile += (sourceManaged in Compile).value
 //      unmanagedSourceDirectories in Compile += baseDirectory.value / "target" / "scala-2.11" / "src_managed" / "main"
     ).dependsOn(common % "test->test;compile->compile").
       dependsOn(user).dependsOn(product).dependsOn(order)
 
-
+  lazy val root = (project in file(".")).
+    settings(Commons.settings: _*).
+    aggregate(shop)
 }

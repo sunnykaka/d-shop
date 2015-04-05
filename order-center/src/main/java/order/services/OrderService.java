@@ -1,5 +1,6 @@
 package order.services;
 
+import common.services.GeneralDao;
 import common.utils.page.Page;
 import order.constants.OrderStatus;
 import order.dtos.OrderSearcher;
@@ -7,9 +8,9 @@ import order.models.Order;
 import order.models.OrderItem;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.Assert;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
@@ -17,8 +18,8 @@ import javax.persistence.Query;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.*;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import static common.utils.SQLUtils.*;
 
 /**
  * Created by liubin on 15-4-2.
@@ -29,8 +30,11 @@ public class OrderService {
     @PersistenceContext
     EntityManager em;
 
+    @Autowired
+    GeneralDao generalDao;
+
     @Transactional(readOnly = true)
-    public List<Order> findByKey(Optional<Page> page, Optional<String> orderNo,
+    public List<Order> findByKey(Optional<Page<Order>> page, Optional<String> orderNo,
         Optional<OrderStatus> status, Optional<DateTime> createTimeStart, Optional<DateTime> createTimeEnd) {
 
         CriteriaBuilder cb = em.getCriteriaBuilder();
@@ -75,7 +79,7 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<Order> findByComplicateKey(Optional<Page> page, OrderSearcher orderSearcher) {
+    public List<Order> findByComplicateKey(Optional<Page<Order>> page, OrderSearcher orderSearcher) {
 
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<Order> cq = cb.createQuery(Order.class);
@@ -105,17 +109,21 @@ public class OrderService {
             predicateList.add(cb.equal(orderItemList.get("productSku"), orderSearcher.productSku));
         }
 
-        cq.select(order).where(predicateList.toArray(new Predicate[predicateList.size()]));
+        cq.select(order).where(predicateList.toArray(new Predicate[predicateList.size()])).groupBy(order.get("id"));
 
         TypedQuery<Order> query = em.createQuery(cq);
 
         if(page.isPresent()) {
+//            CriteriaQuery<Long> countCq = cb.createQuery(Long.class);
+//            countCq.select(cb.count(order)).where(predicateList.toArray(new Predicate[predicateList.size()]));
+//            Long count = em.createQuery(countCq).getSingleResult();
+//            page.get().setTotalCount(count.intValue());
+
             CriteriaQuery<Long> countCq = cb.createQuery(Long.class);
-            Root<Order> countOrder = countCq.from(Order.class);
-            countOrder.joinList("orderItemList");
-            countCq.select(cb.count(countOrder)).where(predicateList.toArray(new Predicate[predicateList.size()]));
-            Long count = em.createQuery(countCq).getSingleResult();
-            page.get().setTotalCount(count.intValue());
+            countCq.from(Order.class).joinList("orderItemList");
+            countCq.select(cb.count(order)).where(predicateList.toArray(new Predicate[predicateList.size()])).groupBy(order.get("id"));
+            List resultList = em.createQuery(countCq).getResultList();
+            page.get().setTotalCount(resultList.size());
 
             query.setFirstResult(page.get().getStart());
             query.setMaxResults(page.get().getLimit());
@@ -131,7 +139,7 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<Order> findByComplicateKeyWithJpql(Optional<Page> page, OrderSearcher orderSearcher) {
+    public List<Order> findByComplicateKeyWithJpql(Optional<Page<Order>> page, OrderSearcher orderSearcher) {
 
         String jpql = "select o from Order o join o.orderItemList oi where 1=1 ";
         Map<String, Object> queryParams = new HashMap<>();
@@ -157,13 +165,15 @@ public class OrderService {
             queryParams.put("type", orderSearcher.type);
         }
         if(orderSearcher.orderItemStatus != null) {
-            jpql += " and oi.type = :orderItemStatus ";
+            jpql += " and oi.status = :orderItemStatus ";
             queryParams.put("orderItemStatus", orderSearcher.orderItemStatus);
         }
         if(!StringUtils.isBlank(orderSearcher.productSku)) {
             jpql += " and oi.productSku = :productSku ";
             queryParams.put("productSku", orderSearcher.productSku);
         }
+
+        jpql += " group by o.id ";
 
         Query query = em.createQuery(jpql);
         queryParams.forEach(query::setParameter);
@@ -173,12 +183,21 @@ public class OrderService {
             String countJpql = " select count(1) " + removeFetchInCountQl(removeSelect(removeOrderBy(jpql)));
             Query countQuery = em.createQuery(countJpql);
             queryParams.forEach(countQuery::setParameter);
-            Long count = (Long)countQuery.getSingleResult();
 
-            page.get().setTotalCount(count.intValue());
 
+            if(hasGroupBy(jpql)) {
+                List resultList = countQuery.getResultList();
+                page.get().setTotalCount(resultList.size());
+
+            } else {
+
+                Long count = (Long)countQuery.getSingleResult();
+                page.get().setTotalCount(count.intValue());
+
+            }
             query.setFirstResult(page.get().getStart());
             query.setMaxResults(page.get().getLimit());
+
         }
 
         List<Order> results = query.getResultList();
@@ -190,58 +209,45 @@ public class OrderService {
         return results;
     }
 
-    /**
-     * hql语句如果用了fetch,删除查询总条数的fetch语句,否则会报错
-     * @param countQL
-     * @return
-     */
-    private String removeFetchInCountQl(String countQL) {
-        if(StringUtils.contains(countQL, " fetch ")) {
-            countQL = (countQL.toString().replaceAll("fetch", ""));
+    @Transactional(readOnly = true)
+    public List<Order> findByComplicateKeyWithGeneralDaoQuery(Optional<Page<Order>> page, OrderSearcher orderSearcher) {
+
+        String jpql = "select o from Order o join o.orderItemList oi where 1=1 ";
+        Map<String, Object> queryParams = new HashMap<>();
+
+        if(orderSearcher.orderNo != null) {
+            jpql += " and o.order = :orderNo ";
+            queryParams.put("orderNo", orderSearcher.orderNo);
         }
-        return countQL;
-    }
-
-    private boolean hasGroupBy(String ql) {
-        if(ql != null && !"".equals(ql)){
-            if(ql.indexOf("group by") > -1){
-                return true;
-            }
+        if(orderSearcher.createTimeStart != null) {
+            jpql += " and o.createTime >= :createTimeStart ";
+            queryParams.put("createTimeStart", orderSearcher.createTimeStart);
         }
-        return false;
-    }
-
-    /**
-     * 去除ql语句中的select子句
-     * @param ql 查询语句
-     * @return 删除后的语句
-     */
-    private String removeSelect(String ql) {
-        Assert.hasText(ql);
-        int beginPos = ql.toLowerCase().indexOf("from");
-        Assert.isTrue(beginPos != -1, " ql : " + ql + " must has a keyword 'from'");
-        return ql.substring(beginPos);
-    }
-
-    // 删除order by字句使用的正则表达式
-    private static Pattern removeOrderByPattern = Pattern.compile("order\\s*by[\\w|\\W|\\s|\\S]*", Pattern.CASE_INSENSITIVE);
-
-    /**
-     * 删除ql语句中的order by字句
-     * @param ql 查询语句
-     * @return 删除后的查询语句
-     */
-    private String removeOrderBy(String ql){
-        if(ql != null && !"".equals(ql)){
-            Matcher m = removeOrderByPattern.matcher(ql);
-            StringBuffer sb = new StringBuffer();
-            while (m.find()) {
-                m.appendReplacement(sb, "");
-            }
-            m.appendTail(sb);
-            return sb.toString();
+        if(orderSearcher.createTimeEnd != null) {
+            jpql += " and o.createTime <= :createTimeEnd ";
+            queryParams.put("createTimeEnd", orderSearcher.createTimeEnd);
         }
-        return "";
+        if(orderSearcher.status != null) {
+            jpql += " and o.status = :status ";
+            queryParams.put("status", orderSearcher.status);
+        }
+        if(orderSearcher.type != null) {
+            jpql += " and o.type = :type ";
+            queryParams.put("type", orderSearcher.type);
+        }
+        if(orderSearcher.orderItemStatus != null) {
+            jpql += " and oi.status = :orderItemStatus ";
+            queryParams.put("orderItemStatus", orderSearcher.orderItemStatus);
+        }
+        if(!StringUtils.isBlank(orderSearcher.productSku)) {
+            jpql += " and oi.productSku = :productSku ";
+            queryParams.put("productSku", orderSearcher.productSku);
+        }
+
+        jpql += " group by o.id ";
+
+        return generalDao.query(jpql, page, queryParams);
+
     }
 
 }

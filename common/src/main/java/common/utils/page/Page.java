@@ -3,7 +3,7 @@ package common.utils.page;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Page {
+public class Page<T> {
 
     /** 每页显示 15 条数据 */
     public static final int DEFAULT_PAGE_SIZE = 15;
@@ -19,7 +19,7 @@ public class Page {
     private int totalCount;
 
     /** 分页数据 */
-    private List result = new ArrayList();
+    private List<T> result = new ArrayList<T>();
 
     public Page(int pageNo, int pageSize) {
         setPageNo(pageNo);
@@ -65,11 +65,11 @@ public class Page {
         this.pageSize = (pageSize < 1) ? DEFAULT_PAGE_SIZE : pageSize;
     }
 
-    public List getResult() {
+    public List<T> getResult() {
         return result;
     }
 
-    public void setResult(List result) {
+    public void setResult(List<T> result) {
         this.result = result;
     }
 
