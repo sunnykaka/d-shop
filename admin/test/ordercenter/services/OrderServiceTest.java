@@ -1,6 +1,5 @@
 package ordercenter.services;
 
-import base.BaseTest;
 import base.PrepareOrderData;
 import common.utils.DateUtils;
 import common.utils.Money;
@@ -14,20 +13,19 @@ import org.joda.time.DateTime;
 import org.junit.Test;
 import utils.Global;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
 
+import static java.util.Optional.empty;
+import static java.util.Optional.of;
 import static play.test.Helpers.fakeApplication;
 import static play.test.Helpers.running;
-import static java.util.Optional.*;
 
 /**
  * Created by liubin on 15-4-2.
  */
-public class OrderServiceTest extends BaseTest implements PrepareOrderData{
+public class OrderServiceTest implements PrepareOrderData{
 
     @Test
     public void testCRUDInOrder() {

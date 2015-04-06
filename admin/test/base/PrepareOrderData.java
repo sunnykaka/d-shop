@@ -13,7 +13,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 /**
  * Created by liubin on 15/4/6.
  */
-public interface PrepareOrderData extends BaseTestIF {
+public interface PrepareOrderData extends BaseTest {
 
     default void prepareOrders(int orderSize, int itemPerOrderSize) {
         doInTransaction(em -> {

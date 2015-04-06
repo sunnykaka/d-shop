@@ -8,11 +8,11 @@ import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
 
 /**
- * Created by liubin on 15-4-3.
+ * Created by liubin on 15/4/6.
  */
-public abstract class BaseTest implements BaseTestIF {
+public interface BaseTest {
 
-    public <T> T doInTransaction(EntityManagerCallback<T> callback) {
+    default <T> T doInTransaction(EntityManagerCallback<T> callback) {
         EntityManagerFactory emf = Global.ctx.getBean(EntityManagerFactory.class);
         EntityManager em = emf.createEntityManager();
         EntityTransaction tx = null;
@@ -37,7 +37,7 @@ public abstract class BaseTest implements BaseTestIF {
 
     }
 
-    public <T> T doInTransactionWithGeneralDao(GeneralDaoCallback<T> callback) {
+    default  <T> T doInTransactionWithGeneralDao(GeneralDaoCallback<T> callback) {
         return doInTransaction(em -> {
             GeneralDao generalDao = new GeneralDao(em);
             return callback.call(generalDao);
@@ -45,5 +45,13 @@ public abstract class BaseTest implements BaseTestIF {
     }
 
 
-}
+    @FunctionalInterface
+    static interface EntityManagerCallback<T> {
+        T call(EntityManager em);
+    }
 
+    @FunctionalInterface
+    static interface GeneralDaoCallback<T> {
+        T call(GeneralDao generalDao);
+    }
+}
