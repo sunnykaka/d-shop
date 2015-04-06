@@ -1,11 +1,11 @@
-package order.services;
+package ordercenter.services;
 
 import common.services.GeneralDao;
 import common.utils.page.Page;
-import order.constants.OrderStatus;
-import order.dtos.OrderSearcher;
-import order.models.Order;
-import order.models.OrderItem;
+import ordercenter.constants.OrderStatus;
+import ordercenter.dtos.OrderSearcher;
+import ordercenter.models.*;
+import ordercenter.models.Order;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -114,10 +114,6 @@ public class OrderService {
         TypedQuery<Order> query = em.createQuery(cq);
 
         if(page.isPresent()) {
-//            CriteriaQuery<Long> countCq = cb.createQuery(Long.class);
-//            countCq.select(cb.count(order)).where(predicateList.toArray(new Predicate[predicateList.size()]));
-//            Long count = em.createQuery(countCq).getSingleResult();
-//            page.get().setTotalCount(count.intValue());
 
             CriteriaQuery<Long> countCq = cb.createQuery(Long.class);
             countCq.from(Order.class).joinList("orderItemList");
@@ -145,7 +141,7 @@ public class OrderService {
         Map<String, Object> queryParams = new HashMap<>();
 
         if(orderSearcher.orderNo != null) {
-            jpql += " and o.order = :orderNo ";
+            jpql += " and o.orderNo = :orderNo ";
             queryParams.put("orderNo", orderSearcher.orderNo);
         }
         if(orderSearcher.createTimeStart != null) {
@@ -200,7 +196,7 @@ public class OrderService {
 
         }
 
-        List<Order> results = query.getResultList();
+        List<ordercenter.models.Order> results = query.getResultList();
 
         if(page.isPresent()) {
             page.get().setResult(results);

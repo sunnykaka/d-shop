@@ -1,8 +1,8 @@
-package order.dtos;
+package ordercenter.dtos;
 
-import order.constants.OrderItemStatus;
-import order.constants.OrderStatus;
-import order.constants.OrderType;
+import ordercenter.constants.OrderItemStatus;
+import ordercenter.constants.OrderStatus;
+import ordercenter.constants.OrderType;
 import org.joda.time.DateTime;
 
 /**

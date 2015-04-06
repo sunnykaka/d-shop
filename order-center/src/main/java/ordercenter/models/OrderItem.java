@@ -1,10 +1,10 @@
-package order.models;
+package ordercenter.models;
 
 import common.models.utils.EntityClass;
 import common.utils.Money;
-import order.constants.OrderItemStatus;
-import order.constants.OrderItemType;
-import order.constants.PlatformType;
+import ordercenter.constants.OrderItemStatus;
+import ordercenter.constants.OrderItemType;
+import ordercenter.constants.PlatformType;
 import org.hibernate.annotations.Type;
 
 import javax.persistence.*;

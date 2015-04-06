@@ -1,4 +1,4 @@
-package order.models;
+package ordercenter.models;
 
 
 import common.models.Receiver;

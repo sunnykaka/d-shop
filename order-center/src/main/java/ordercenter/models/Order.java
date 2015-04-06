@@ -1,11 +1,11 @@
-package order.models;
+package ordercenter.models;
 
 import common.models.utils.EntityClass;
 import common.models.utils.OperableData;
 import common.utils.Money;
-import order.constants.OrderStatus;
-import order.constants.OrderType;
-import order.constants.PlatformType;
+import ordercenter.constants.OrderStatus;
+import ordercenter.constants.OrderType;
+import ordercenter.constants.PlatformType;
 import org.hibernate.annotations.Type;
 import org.joda.time.DateTime;
 

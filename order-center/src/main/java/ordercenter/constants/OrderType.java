@@ -1,4 +1,4 @@
-package order.constants;
+package ordercenter.constants;
 
 /**
  * 订单类型

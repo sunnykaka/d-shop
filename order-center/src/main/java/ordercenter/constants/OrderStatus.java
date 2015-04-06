@@ -1,4 +1,4 @@
-package order.constants;
+package ordercenter.constants;
 
 import org.apache.commons.lang3.StringUtils;
 

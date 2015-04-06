@@ -1,19 +1,21 @@
-package order.services;
+package ordercenter.services;
 
 import base.BaseTest;
 import common.utils.DateUtils;
 import common.utils.Money;
 import common.utils.page.Page;
-import order.constants.*;
-import order.dtos.OrderSearcher;
-import order.models.Order;
-import order.models.OrderItem;
+import ordercenter.constants.*;
+import ordercenter.dtos.OrderSearcher;
+import ordercenter.models.Order;
+import ordercenter.models.OrderItem;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.joda.time.DateTime;
 import org.junit.Test;
 import utils.Global;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
 
@@ -163,8 +165,89 @@ public class OrderServiceTest extends BaseTest{
         });
     }
 
+    @Test
+    public void testGeneralDaoMergeAndUpdate() {
+        running(fakeApplication(), () -> {
 
-    private void runTestFindByComplicateMethodJpql(BiFunction<Optional<Page<Order>>, OrderSearcher, List<Order>> method) {
+            prepareOrders(0, 0);
+
+            Order order1 = doInTransactionWithGeneralDao(generalDao -> {
+
+                //创建订单
+                Order order = new Order();
+                order.setOrderNo(RandomStringUtils.randomAlphanumeric(8));
+                order.setPlatformType(PlatformType.WEB);
+                order.setStatus(OrderStatus.WAIT_PROCESS);
+
+                generalDao.persist(order);
+                generalDao.flush();
+                generalDao.detach(order);
+
+                assert order.getCreateTime() != null;
+                assert order.getUpdateTime() == null;
+                assert order.getId() > 0;
+
+                //此时更新无用,因为对象已没有被session管理(显式detach)
+                order.setStatus(OrderStatus.INVALID);
+
+                return order;
+            });
+
+            doInTransactionWithGeneralDao(generalDao -> {
+
+                //校验之前的更新确实没起作用
+                Order order = generalDao.get(Order.class, order1.getId());
+                assert order.getStatus() == OrderStatus.WAIT_PROCESS;
+                return null;
+            });
+
+            doInTransactionWithGeneralDao(generalDao -> {
+
+                //merge,会根据order1的id从数据库load出order2对象,再把order1的属性拷给order2
+                order1.setStatus(OrderStatus.INVALID);
+                Order order2 = generalDao.merge(order1);
+                assert order2.getStatus() == order1.getStatus();
+
+                //对order1的更新无用,对order2的更新有用.因为order1没有被session管理
+                order1.setStatus(OrderStatus.PRINTED);
+                order2.setStatus(OrderStatus.INVOICED);
+
+                return null;
+            });
+
+            doInTransactionWithGeneralDao(generalDao -> {
+                //校验确实是order2的更新起作用
+                Order order = generalDao.get(Order.class, order1.getId());
+                assert order.getStatus() == OrderStatus.INVOICED;
+                return null;
+            });
+
+            //测试update方法
+            doInTransactionWithGeneralDao(generalDao -> {
+
+                Map<String, Object> params = new HashMap<String, Object>();
+                params.put("status", OrderStatus.SIGNED);
+                params.put("id", order1.getId());
+
+
+                int update = generalDao.update(" update Order o set o.status = :status where o.id = :id ", params);
+                assert update == 1;
+
+                return null;
+            });
+
+            doInTransactionWithGeneralDao(generalDao -> {
+
+                Order order = generalDao.get(Order.class, order1.getId());
+                assert order.getStatus() == OrderStatus.SIGNED;
+                return null;
+            });
+
+        });
+    }
+
+
+            private void runTestFindByComplicateMethodJpql(BiFunction<Optional<Page<Order>>, OrderSearcher, List<Order>> method) {
 
         OrderSearcher orderSearcher = new OrderSearcher();
         orderSearcher.status = OrderStatus.WAIT_PROCESS;

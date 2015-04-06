@@ -1,6 +1,10 @@
 package common.services;
 
+import common.models.utils.EntityClass;
+import common.models.utils.OperableData;
+import common.utils.DateUtils;
 import common.utils.page.Page;
+import org.joda.time.DateTime;
 import org.springframework.stereotype.Repository;
 
 import javax.persistence.EntityManager;
@@ -20,6 +24,10 @@ public class GeneralDao {
 
     @PersistenceContext
     EntityManager em;
+
+    public GeneralDao(){}
+
+    public GeneralDao(EntityManager em) {this.em = em;}
 
     public EntityManager getEm() {
         return em;
@@ -64,6 +72,74 @@ public class GeneralDao {
         }
 
         return results;
+    }
+
+    /**
+     * 使用jpql进行数据更新操作
+     * @param ql
+     * @param queryParams
+     * @return
+     */
+    public int update(String ql, Map<String, Object> queryParams) {
+
+        Query query = em.createQuery(ql);
+        queryParams.forEach(query::setParameter);
+
+        return query.executeUpdate();
+    }
+
+    public <T extends EntityClass<Integer>> void persist(T t) {
+        setOperableDataIfNecessary(t, true);
+        em.persist(t);
+    }
+
+    public <T extends EntityClass<Integer>> T merge(T t) {
+        setOperableDataIfNecessary(t, false);
+        return em.merge(t);
+    }
+
+    public <T extends EntityClass<Integer>> boolean remove(T t) {
+        if(t != null) {
+            em.remove(t);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public <T extends EntityClass<Integer>> boolean removeById(Class<T> type, Integer id) {
+        T t = get(type, id);
+        return remove(t);
+    }
+
+    public <T extends EntityClass<Integer>> T get(Class<T> type, Integer id) {
+        return em.find(type, id);
+    }
+
+    public void flush() {
+        em.flush();
+    }
+
+    public <T extends EntityClass<Integer>> void refresh(T t) {
+        em.refresh(t);
+    }
+
+    public <T extends EntityClass<Integer>> void detach(T t) {
+        em.detach(t);
+    }
+
+
+
+    private <T extends EntityClass<Integer>> void setOperableDataIfNecessary(T t, boolean isCreate) {
+        if(t instanceof OperableData) {
+            OperableData operableData = (OperableData)t;
+            DateTime now = DateUtils.current();
+            operableData.setCreateTime(now);
+            if(!isCreate) {
+                operableData.setUpdateTime(now);
+            }
+            //TODO set operator
+        }
     }
 
 
