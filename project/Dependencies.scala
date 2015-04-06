@@ -45,7 +45,7 @@ object Dependencies {
 
   val orderDependencies: Seq[ModuleID] = Seq()
 
-  val shopDependencies: Seq[ModuleID] = Seq(mysqlConnector) ++ springTest ++ c3p0
+  val adminDependencies: Seq[ModuleID] = Seq(mysqlConnector) ++ springTest ++ c3p0
 
 
 }

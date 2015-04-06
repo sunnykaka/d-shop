@@ -33,11 +33,11 @@ object ApplicationBuild extends Build {
     dependsOn(common)
 
 
-  lazy val shop = (project in file("shop")).
+  lazy val admin = (project in file("admin")).
     enablePlugins(play.PlayJava).
     settings(Commons.settings: _*).
     settings(
-      libraryDependencies ++= shopDependencies,
+      libraryDependencies ++= adminDependencies,
       sourceGenerators in Compile += task {
         val dir: File = (sourceManaged in Compile).value / "controllers"
         val dirs = Seq(dir / "ref", dir / "javascript")
@@ -51,5 +51,5 @@ object ApplicationBuild extends Build {
 
   lazy val root = (project in file(".")).
     settings(Commons.settings: _*).
-    aggregate(shop)
+    aggregate(admin)
 }

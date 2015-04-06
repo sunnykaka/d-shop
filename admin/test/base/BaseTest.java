@@ -10,9 +10,9 @@ import javax.persistence.EntityTransaction;
 /**
  * Created by liubin on 15-4-3.
  */
-public class BaseTest {
+public abstract class BaseTest implements BaseTestIF {
 
-    protected <T> T doInTransaction(EntityManagerCallback<T> callback) {
+    public <T> T doInTransaction(EntityManagerCallback<T> callback) {
         EntityManagerFactory emf = Global.ctx.getBean(EntityManagerFactory.class);
         EntityManager em = emf.createEntityManager();
         EntityTransaction tx = null;
@@ -37,22 +37,13 @@ public class BaseTest {
 
     }
 
-    protected <T> T doInTransactionWithGeneralDao(GeneralDaoCallback<T> callback) {
+    public <T> T doInTransactionWithGeneralDao(GeneralDaoCallback<T> callback) {
         return doInTransaction(em -> {
             GeneralDao generalDao = new GeneralDao(em);
             return callback.call(generalDao);
         });
     }
 
-    @FunctionalInterface
-    static protected interface EntityManagerCallback<T> {
-        T call(EntityManager em);
-    }
-
-    @FunctionalInterface
-    static protected interface GeneralDaoCallback<T> {
-        T call(GeneralDao generalDao);
-    }
 
 }
 

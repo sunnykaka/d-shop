@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Query;
+import javax.persistence.criteria.CriteriaQuery;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,10 +39,10 @@ public class GeneralDao {
      * @param ql jpql
      * @param page 分页对象,可选
      * @param queryParams 查询参数
-     * @param <RT>
+     * @param <T>
      * @return
      */
-    public <RT> List<RT> query(String ql, Optional<Page<RT>> page, Map<String, Object> queryParams) {
+    public <T extends EntityClass<Integer>> List<T> query(String ql, Optional<Page<T>> page, Map<String, Object> queryParams) {
 
         Query query = em.createQuery(ql);
         queryParams.forEach(query::setParameter);
@@ -65,13 +66,25 @@ public class GeneralDao {
             query.setMaxResults(page.get().getLimit());
         }
 
-        List<RT> results = query.getResultList();
+        List<T> results = query.getResultList();
 
         if(page.isPresent()) {
             page.get().setResult(results);
         }
 
         return results;
+    }
+
+    /**
+     * 查询所有
+     * @param type
+     * @param <T>
+     * @return
+     */
+    public <T extends EntityClass<Integer>> List<T> findAll(Class<T> type) {
+        CriteriaQuery<T> c = em.getCriteriaBuilder().createQuery(type);
+        c.from(type);
+        return em.createQuery(c).getResultList();
     }
 
     /**

@@ -24,7 +24,6 @@ public class Application extends Controller {
         Form<Bar> form = Form.form(Bar.class).bindFromRequest();
         Bar bar = form.get();
         barService.addBar(bar);
-        System.out.println(bar.name);
         return redirect(controllers.routes.Application.index());
     }
 

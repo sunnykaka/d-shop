@@ -1,6 +1,7 @@
 package ordercenter.services;
 
 import base.BaseTest;
+import base.PrepareOrderData;
 import common.utils.DateUtils;
 import common.utils.Money;
 import common.utils.page.Page;
@@ -26,7 +27,7 @@ import static java.util.Optional.*;
 /**
  * Created by liubin on 15-4-2.
  */
-public class OrderServiceTest extends BaseTest{
+public class OrderServiceTest extends BaseTest implements PrepareOrderData{
 
     @Test
     public void testCRUDInOrder() {
@@ -36,9 +37,9 @@ public class OrderServiceTest extends BaseTest{
 
             OrderService orderService = Global.ctx.getBean(OrderService.class);
             String orderNo = RandomStringUtils.randomNumeric(8);
+            //创建订单
+            Order order1 = new Order();
             Integer orderId = doInTransaction(em -> {
-                //创建订单
-                Order order1 = new Order();
                 order1.setOrderNo(orderNo);
                 order1.setPlatformType(PlatformType.WEB);
                 order1.setStatus(OrderStatus.WAIT_PROCESS);
@@ -165,89 +166,7 @@ public class OrderServiceTest extends BaseTest{
         });
     }
 
-    @Test
-    public void testGeneralDaoMergeAndUpdate() {
-        running(fakeApplication(), () -> {
-
-            prepareOrders(0, 0);
-
-            Order order1 = doInTransactionWithGeneralDao(generalDao -> {
-
-                //创建订单
-                Order order = new Order();
-                order.setOrderNo(RandomStringUtils.randomAlphanumeric(8));
-                order.setPlatformType(PlatformType.WEB);
-                order.setStatus(OrderStatus.WAIT_PROCESS);
-
-                generalDao.persist(order);
-                generalDao.flush();
-                generalDao.detach(order);
-
-                assert order.getCreateTime() != null;
-                assert order.getUpdateTime() == null;
-                assert order.getId() > 0;
-
-                //此时更新无用,因为对象已没有被session管理(显式detach)
-                order.setStatus(OrderStatus.INVALID);
-
-                return order;
-            });
-
-            doInTransactionWithGeneralDao(generalDao -> {
-
-                //校验之前的更新确实没起作用
-                Order order = generalDao.get(Order.class, order1.getId());
-                assert order.getStatus() == OrderStatus.WAIT_PROCESS;
-                return null;
-            });
-
-            doInTransactionWithGeneralDao(generalDao -> {
-
-                //merge,会根据order1的id从数据库load出order2对象,再把order1的属性拷给order2
-                order1.setStatus(OrderStatus.INVALID);
-                Order order2 = generalDao.merge(order1);
-                assert order2.getStatus() == order1.getStatus();
-
-                //对order1的更新无用,对order2的更新有用.因为order1没有被session管理
-                order1.setStatus(OrderStatus.PRINTED);
-                order2.setStatus(OrderStatus.INVOICED);
-
-                return null;
-            });
-
-            doInTransactionWithGeneralDao(generalDao -> {
-                //校验确实是order2的更新起作用
-                Order order = generalDao.get(Order.class, order1.getId());
-                assert order.getStatus() == OrderStatus.INVOICED;
-                return null;
-            });
-
-            //测试update方法
-            doInTransactionWithGeneralDao(generalDao -> {
-
-                Map<String, Object> params = new HashMap<String, Object>();
-                params.put("status", OrderStatus.SIGNED);
-                params.put("id", order1.getId());
-
-
-                int update = generalDao.update(" update Order o set o.status = :status where o.id = :id ", params);
-                assert update == 1;
-
-                return null;
-            });
-
-            doInTransactionWithGeneralDao(generalDao -> {
-
-                Order order = generalDao.get(Order.class, order1.getId());
-                assert order.getStatus() == OrderStatus.SIGNED;
-                return null;
-            });
-
-        });
-    }
-
-
-            private void runTestFindByComplicateMethodJpql(BiFunction<Optional<Page<Order>>, OrderSearcher, List<Order>> method) {
+    private void runTestFindByComplicateMethodJpql(BiFunction<Optional<Page<Order>>, OrderSearcher, List<Order>> method) {
 
         OrderSearcher orderSearcher = new OrderSearcher();
         orderSearcher.status = OrderStatus.WAIT_PROCESS;
@@ -273,43 +192,6 @@ public class OrderServiceTest extends BaseTest{
 
     }
 
-
-    private void prepareOrders(int orderSize, int itemPerOrderSize) {
-        doInTransaction(em -> {
-
-            em.createQuery("delete from OrderItem").executeUpdate();
-            em.createQuery("delete from Order").executeUpdate();
-
-            //创建订单
-            for (int i = 0; i < orderSize; i++) {
-                Order order = new Order();
-                order.setOrderNo(RandomStringUtils.randomNumeric(8));
-                order.setPlatformType(PlatformType.WEB);
-                order.setStatus(OrderStatus.WAIT_PROCESS);
-                order.setCreateTime(DateUtils.current());
-                order.setUpdateTime(DateUtils.current());
-
-                em.persist(order);
-
-                for (int j = 0; j < itemPerOrderSize; j++) {
-                    OrderItem orderItem = new OrderItem();
-                    orderItem.setOrderId(order.getId());
-                    orderItem.setBuyCount(5);
-                    orderItem.setPlatformType(order.getPlatformType());
-                    orderItem.setDiscountFee(Money.valueOf(10));
-                    orderItem.setPrice(Money.valueOf(20));
-                    orderItem.setStatus(OrderItemStatus.NOT_SIGNED);
-                    orderItem.setType(OrderItemType.PRODUCT);
-                    orderItem.setProductId(Integer.parseInt(RandomStringUtils.randomNumeric(8)));
-                    orderItem.setProductSku(RandomStringUtils.randomAlphabetic(8));
-
-                    em.persist(orderItem);
-                }
-            }
-
-            return null;
-        });
-    }
 }
 //import static org.hamcrest.MatcherAssert.*;
 
